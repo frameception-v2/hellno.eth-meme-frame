@@ -119,11 +119,7 @@ export default function Frame() {
         paddingRight: context?.client.safeAreaInsets?.right ?? 0,
       }}
     >
-      <div className="w-[300px] mx-auto py-2 px-2">
-        <h1 className="text-2xl font-bold text-center mb-4 text-neutral-900">
-          {PROJECT_TITLE}
-        </h1>
-        
+      <div className="w-full md:w-[300px] mx-auto py-2 px-4">
         {error && (
           <Card className="mb-4 bg-red-50">
             <CardContent className="pt-4">
@@ -136,7 +132,7 @@ export default function Frame() {
           <div className="text-center">Loading memes...</div>
         ) : (
           memes.map((meme) => (
-            <Card key={meme.id} className="mb-4">
+            <Card key={meme.id} className="mb-4 w-full">
               <CardHeader>
                 <CardTitle className="text-sm">{meme.name}</CardTitle>
                 <CardDescription className="text-xs">
@@ -149,8 +145,8 @@ export default function Frame() {
                   alt={meme.name}
                   className="w-full h-auto rounded"
                   style={{
-                    maxHeight: '200px',
-                    objectFit: 'contain'
+                    maxHeight: '300px',
+                    objectFit: 'cover'
                   }}
                 />
               </CardContent>
