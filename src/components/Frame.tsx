@@ -13,38 +13,44 @@ import {
   CardDescription,
   CardContent,
 } from "~/components/ui/card";
-
-import { config } from "~/components/providers/WagmiProvider";
-import { truncateAddress } from "~/lib/truncateAddress";
-import { base, optimism } from "wagmi/chains";
-import { useSession } from "next-auth/react";
-import { createStore } from "mipd";
+import { PROJECT_TITLE, PROJECT_DESCRIPTION, IMGFLIP_API_URL, DEFAULT_MEME_LIMIT } from "~/lib/constants";
 import { Label } from "~/components/ui/label";
-import { PROJECT_TITLE } from "~/lib/constants";
 
-function ExampleCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Welcome to the Frame Template</CardTitle>
-        <CardDescription>
-          This is an example card that you can customize or remove
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Label>Place content in a Card here.</Label>
-      </CardContent>
-    </Card>
-  );
+interface Meme {
+  id: string;
+  name: string;
+  url: string;
+  width: number;
+  height: number;
+  box_count: number;
 }
 
 export default function Frame() {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [context, setContext] = useState<Context.FrameContext>();
-
   const [added, setAdded] = useState(false);
-
   const [addFrameResult, setAddFrameResult] = useState("");
+  const [memes, setMemes] = useState<Meme[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchMemes = useCallback(async () => {
+    try {
+      const response = await fetch(IMGFLIP_API_URL);
+      if (!response.ok) throw new Error('Failed to fetch memes');
+      
+      const data = await response.json();
+      if (!data.success) throw new Error('Imgflip API error');
+      
+      setMemes(data.data.memes.slice(0, DEFAULT_MEME_LIMIT));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load memes');
+      setMemes([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const addFrame = useCallback(async () => {
     try {
@@ -53,11 +59,9 @@ export default function Frame() {
       if (error instanceof AddFrame.RejectedByUser) {
         setAddFrameResult(`Not added: ${error.message}`);
       }
-
       if (error instanceof AddFrame.InvalidDomainManifest) {
         setAddFrameResult(`Not added: ${error.message}`);
       }
-
       setAddFrameResult(`Error: ${error}`);
     }
   }, []);
@@ -65,14 +69,11 @@ export default function Frame() {
   useEffect(() => {
     const load = async () => {
       const context = await sdk.context;
-      if (!context) {
-        return;
-      }
+      if (!context) return;
 
       setContext(context);
       setAdded(context.client.added);
 
-      // If frame isn't already added, prompt user to add it
       if (!context.client.added) {
         addFrame();
       }
@@ -90,38 +91,20 @@ export default function Frame() {
         setAdded(false);
       });
 
-      sdk.on("notificationsEnabled", ({ notificationDetails }) => {
-        console.log("notificationsEnabled", notificationDetails);
-      });
-      sdk.on("notificationsDisabled", () => {
-        console.log("notificationsDisabled");
-      });
-
-      sdk.on("primaryButtonClicked", () => {
-        console.log("primaryButtonClicked");
-      });
-
-      console.log("Calling ready");
       sdk.actions.ready({});
-
-      // Set up a MIPD Store, and request Providers.
-      const store = createStore();
-
-      // Subscribe to the MIPD Store.
-      store.subscribe((providerDetails) => {
-        console.log("PROVIDER DETAILS", providerDetails);
-        // => [EIP6963ProviderDetail, EIP6963ProviderDetail, ...]
-      });
+      
+      // Fetch memes after SDK setup
+      await fetchMemes();
     };
+    
     if (sdk && !isSDKLoaded) {
-      console.log("Calling load");
       setIsSDKLoaded(true);
       load();
       return () => {
         sdk.removeAllListeners();
       };
     }
-  }, [isSDKLoaded, addFrame]);
+  }, [isSDKLoaded, addFrame, fetchMemes]);
 
   if (!isSDKLoaded) {
     return <div>Loading...</div>;
@@ -140,7 +123,40 @@ export default function Frame() {
         <h1 className="text-2xl font-bold text-center mb-4 text-neutral-900">
           {PROJECT_TITLE}
         </h1>
-        <ExampleCard />
+        
+        {error && (
+          <Card className="mb-4 bg-red-50">
+            <CardContent className="pt-4">
+              <Label className="text-red-600">{error}</Label>
+            </CardContent>
+          </Card>
+        )}
+
+        {isLoading ? (
+          <div className="text-center">Loading memes...</div>
+        ) : (
+          memes.map((meme) => (
+            <Card key={meme.id} className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-sm">{meme.name}</CardTitle>
+                <CardDescription className="text-xs">
+                  Boxes: {meme.box_count}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <img
+                  src={meme.url}
+                  alt={meme.name}
+                  className="w-full h-auto rounded"
+                  style={{
+                    maxHeight: '200px',
+                    objectFit: 'contain'
+                  }}
+                />
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
